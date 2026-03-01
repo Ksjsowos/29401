@@ -599,7 +599,7 @@ local function executeScript()
     local success, errorMsg = pcall(function()
         -- Загружаем скрипт хаба в зависимости от выбранной платформы
         if selectedPlatform == "Mobile" then
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/Lapwpkddm/Hacks/refs/heads/main/Online%20Script/ScriptMobile.lua"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/Ksjsowos/29401/refs/heads/main/Online%20Script/ScriptMobile.lua"))()
         else -- PC
             loadstring(game:HttpGet(""))()
         end
