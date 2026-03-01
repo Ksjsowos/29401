@@ -335,7 +335,6 @@ if fRequest then
     
     if not success or (hostResponse and (hostResponse.StatusCode ~= 200 and hostResponse.StatusCode ~= 429)) then
         host = "https://api.platoboost.net"
-        print("[Platoboost] Switched to backup host:", host)
     end
 end
 
@@ -360,7 +359,6 @@ local function cacheLink()
         identifier = lDigest(hwid)
     }
     
-    print("[Platoboost] Requesting link for HWID:", hwid)
     
     local success, response = pcall(function()
         return fRequest({
@@ -376,11 +374,9 @@ local function cacheLink()
     requestSending = false
     
     if not success or not response then
-        print("[Platoboost] Failed to connect")
         return false, "Failed to connect to Platoboost"
     end
     
-    print("[Platoboost] Response status:", response.StatusCode)
     
     if response.StatusCode == 200 then
         local decoded = lDecode(response.Body)
@@ -388,17 +384,13 @@ local function cacheLink()
         if decoded and decoded.success == true then
             cachedLink = decoded.data.url
             cachedTime = fOsTime()
-            print("[Platoboost] Link received:", cachedLink)
             return true, cachedLink
         else
-            print("[Platoboost] Failed to get link:", decoded and decoded.message or "Unknown error")
             return false, decoded and decoded.message or "Failed to get link"
         end
     elseif response.StatusCode == 429 then
-        print("[Platoboost] Rate limited")
         return false, "Rate limited. Please wait 20 seconds"
     else
-        print("[Platoboost] Server error:", response.StatusCode)
         return false, "Server error: " .. tostring(response.StatusCode)
     end
 end
@@ -414,7 +406,6 @@ end
 
 --! Функция активации ключа (для FREE ключей)
 local function redeemKey(key)
-    print("[Platoboost] Redeeming key:", key)
     
     local nonce = generateNonce()
     local endpoint = host .. "/public/redeem/" .. fToString(service)
@@ -481,12 +472,9 @@ local function verifyKey(key)
     -- Очищаем ключ от пробелов
     key = string.gsub(key, "%s+", "")
     
-    print("[Platoboost] Verifying key:", key)
-    print("[Platoboost] Key starts with:", string.sub(key, 1, 5))
     
     -- ВРЕМЕННЫЙ РЕЖИМ ТЕСТИРОВАНИЯ (принимает FREE ключи без проверки API)
     if TEST_MODE then
-        print("[TEST MODE] Checking test key")
         
         -- Проверяем в списке тестовых ключей
         if TEST_KEYS[key] then
@@ -511,7 +499,6 @@ local function verifyKey(key)
         endpoint = endpoint .. "&nonce=" .. nonce
     end
     
-    print("[Platoboost] Request URL:", endpoint)
     
     local success, response = pcall(function()
         return fRequest({
@@ -526,17 +513,14 @@ local function verifyKey(key)
     requestSending = false
     
     if not success or not response then
-        print("[Platoboost] Connection failed")
         return false, "Failed to connect to verification server"
     end
     
-    print("[Platoboost] Response status:", response.StatusCode)
     
     if response.StatusCode == 200 then
         local decoded = lDecode(response.Body)
         
         if decoded then
-            print("[Platoboost] Response success:", decoded.success)
             
             if decoded.success == true then
                 if decoded.data.valid == true then
@@ -551,7 +535,6 @@ local function verifyKey(key)
                     end
                 else
                     -- Ключ не валиден в whitelist
-                    print("[Platoboost] Key not in whitelist")
                     
                     -- Пробуем активировать ключ через redeem (особенно для FREE ключей)
                     local redeemSuccess, redeemMessage = redeemKey(key)
@@ -571,7 +554,6 @@ local function verifyKey(key)
     elseif response.StatusCode == 429 then
         return false, "Rate limited. Please wait 20 seconds"
     else
-        print("[Platoboost] Server error:", response.StatusCode)
         return false, "Server error: " .. tostring(response.StatusCode)
     end
 end
@@ -622,7 +604,6 @@ end
 
 -- Кнопка Submit (Проверка ключа)
 submitBtn.MouseButton1Click:Connect(function()
-    print("[Submit] Button clicked")
     
     local enteredKey = keyInput.Text
     
@@ -682,7 +663,6 @@ end)
 
 -- Кнопка Get Key (Получение ссылки)
 getKeyBtn.MouseButton1Click:Connect(function()
-    print("[Get Key] Button clicked")
     
     -- Блокируем кнопку на время запроса
     getKeyBtn.Text = "Getting Link..."
@@ -832,22 +812,8 @@ end
 -- Предзагрузка ссылки при запуске
 task.spawn(function()
     task.wait(2)
-    print("[Platoboost] Preloading link...")
     local success, link = cacheLink()
     if success then
-        print("[Platoboost] Link preloaded:", link)
     else
-        print("[Platoboost] Preload failed:", link)
     end
 end)
-
--- Вывод информации о системе
-print("=======================================")
-print("DRACONIC HUB X - KEY SYSTEM")
-print("=======================================")
-print("Service ID:", service)
-print("Host:", host)
-print("Test Mode:", TEST_MODE)
-print("=======================================")
-print("Key 'FREE_ce9cee7b67c4b257da6907af2924dcd2' is accepted")
-print("=======================================")
