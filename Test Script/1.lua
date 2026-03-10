@@ -4,7 +4,7 @@ EventTab:AddSection("Battlepass Modifications")
 
 -- Первый тумблер: Unlocked Pass
 local UnlockedPassToggle = EventTab:AddToggle("UnlockedPassToggle", {
-    Title = "Open Unlocked Pass",
+    Title = "Unlocked Time Pass",
     Default = false,
     Callback = function(state)
         if state then
@@ -94,7 +94,19 @@ local ExchangeOpenToggle = EventTab:AddToggle("ExchangeOpenToggle", {
     end
 })
 
+EventTab:AddSection("Info Unlocked Time Pass")
+
 EventTab:AddParagraph({
-    Title = "Примечание",
-    Content = "Эти функции изменяют отображение интерфейса Battlepass. Отключите их перед закрытием игры."
+    Title = "Pass 1-9",
+    Content = "Buy Items 5"
+})
+
+EventTab:AddParagraph({
+    Title = "Pass 10-18", 
+    Content = "Buy Items 5"
+})
+
+EventTab:AddParagraph({
+    Title = "Pass 19-25",
+    Content = "Buy Items 5"
 })
