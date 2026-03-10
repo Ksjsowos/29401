@@ -17,6 +17,9 @@ local isEnabled = false
 local Fluent = nil
 local Options = nil
 
+-- Store original transparency values
+local originalTransparencies = {}
+
 -- Get nextbot names from ReplicatedStorage
 local nextBotNames = {}
 if ReplicatedStorage:FindFirstChild("NPCs") then
@@ -46,6 +49,58 @@ local function isNextbotModel(model)
            nameLower:find("demon")
 end
 
+-- Function to check if a part is a hitbox (by name patterns)
+local function isHitboxPart(part)
+    if not part or not part.Name then return false end
+    
+    local nameLower = part.Name:lower()
+    return nameLower:find("hitbox") or 
+           nameLower:find("hit") or 
+           nameLower:find("collision") or
+           nameLower:find("collide") or
+           nameLower:find("damage") or
+           nameLower:find("hurt") or
+           nameLower:find("attack") or
+           nameLower:find("body") or
+           nameLower:find("root") or
+           nameLower:find("torso") or
+           nameLower:find("head") or
+           nameLower:find("limb") or
+           nameLower:find("arm") or
+           nameLower:find("leg")
+end
+
+-- Function to make hitboxes visible (transparency = 0)
+local function makeHitboxesVisible(model)
+    if not model then return end
+    
+    -- Store original transparency values and set to 0
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") and isHitboxPart(part) then
+            -- Store original transparency if not already stored
+            if not originalTransparencies[part] then
+                originalTransparencies[part] = part.Transparency
+            end
+            -- Set to 0 (fully visible)
+            part.Transparency = 0
+            -- Also make sure it's visible through walls if needed
+            part.CanQuery = true
+        end
+    end
+end
+
+-- Function to restore original transparency
+local function restoreHitboxesTransparency(model)
+    if not model then return end
+    
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") and originalTransparencies[part] then
+            part.Transparency = originalTransparencies[part]
+            originalTransparencies[part] = nil
+        end
+    end
+end
+
 -- Initialize module with Fluent library
 function module:Init(fluentLib, options)
     Fluent = fluentLib
@@ -63,6 +118,9 @@ local function updateBotHighlight(bot)
                 bot:FindFirstChildWhichIsA("BasePart")
     
     if not hrp then return end
+    
+    -- Make hitboxes visible
+    makeHitboxesVisible(bot)
     
     -- If highlight already exists, just return
     if botHighlights[bot] then
@@ -93,6 +151,9 @@ end
 
 -- Function to remove highlight from a bot
 local function removeBotHighlight(bot)
+    -- Restore original transparency for hitboxes
+    restoreHitboxesTransparency(bot)
+    
     if botHighlights[bot] then
         local highlight = botHighlights[bot]
         if highlight and highlight.Parent then
@@ -104,6 +165,11 @@ end
 
 -- Function to clear all bot highlights
 local function clearAllHighlights()
+    -- Restore transparency for all bots
+    for bot in pairs(botHighlights) do
+        restoreHitboxesTransparency(bot)
+    end
+    
     for bot, highlight in pairs(botHighlights) do
         if highlight and highlight.Parent then
             highlight:Destroy()
@@ -165,6 +231,9 @@ function module:Start()
     if isEnabled then return end
     isEnabled = true
     
+    -- Clear any stored transparency data from previous runs
+    originalTransparencies = {}
+    
     -- Create highlights for existing bots
     updateAllHighlights()
     
@@ -211,7 +280,7 @@ function module:Start()
     if Fluent then
         Fluent:Notify({
             Title = "Highlight Bots",
-            Content = "Enabled (Bots highlighted in RED)",
+            Content = "Enabled (Bots highlighted in RED, hitboxes visible)",
             Duration = 3
         })
     end
