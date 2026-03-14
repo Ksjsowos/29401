@@ -280,7 +280,7 @@ function module:Start()
     if Fluent then
         Fluent:Notify({
             Title = "Highlight Bots",
-            Content = "Enabled (Bots highlighted in RED, hitboxes visible)",
+            Content = "Enabled",
             Duration = 3
         })
     end
