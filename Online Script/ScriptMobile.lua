@@ -7644,7 +7644,90 @@ local function startAutoLupen()
             pcall(function()
                 ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
             end)
+            if securityPart then
+                humanoidRootPart.CFrame = securityPart.CFrame + Vector3.new(0, 3, 0)
+            end
+            return
+        end
+        
+        -- Находим Lupen
+        local lupen = findLupen()
+        if not lupen then
+            -- Если Lupen не найден, стоим на месте
+            if securityPart then
+                humanoidRootPart.CFrame = securityPart.CFrame + Vector3.new(0, 3, 0)
+            end
+            return
+        end
+        
+        -- Получаем HumanoidRootPart Lupen
+        local lupenHRP = lupen:FindFirstChild("HumanoidRootPart")
+        if not lupenHRP then return end
+        
+        -- Увеличиваем угол вращения
+        RotationAngle = (RotationAngle + RotationSpeed) % 360
+        
+        -- Рассчитываем позицию по кругу вокруг Lupen
+        local radAngle = math.rad(RotationAngle)
+        local offsetX = math.cos(radAngle) * RotationRadius
+        local offsetZ = math.sin(radAngle) * RotationRadius
+        
+        -- Позиция: центр Lupen + смещение по кругу + высота
+        local targetPosition = Vector3.new(
+            lupenHRP.Position.X + offsetX,
+            lupenHRP.Position.Y + 1, -- Немного выше, чтобы не застревать
+            lupenHRP.Position.Z + offsetZ
+        )
+        
+        -- Телепортируемся на рассчитанную позицию
+        humanoidRootPart.CFrame = CFrame.new(targetPosition)
+    end)
+    
+    Fluent:Notify({
+        Title = "Auto Farm Lupen",
+        Content = "Now teleporting around Lupen!",
+        Duration = 3
+    })
+end
 
+local function stopAutoLupen()
+    if AutoLupenConnection then
+        AutoLupenConnection:Disconnect()
+        AutoLupenConnection = nil
+    end
+    
+    Fluent:Notify({
+        Title = "Auto Farm Lupen",
+        Content = "Stopped following Lupen.",
+        Duration = 3
+    })
+end
+
+-- Добавляем тумблер в Auto Farm вкладку
+AutoLupenToggle = EventTab:AddToggle("AutoLupenToggle", {
+    Title = "Auto Farm Lupen",
+    Default = false,
+    Callback = function(state)
+        AutoLupenEnabled = state
+        if state then
+            startAutoLupen()
+        else
+            stopAutoLupen()
+        end
+    end
+})
+
+-- Обновляем при респавне
+LocalPlayer.CharacterAdded:Connect(function()
+    if AutoLupenEnabled then
+        -- Небольшая задержка, чтобы персонаж успел загрузиться
+        task.wait(1)
+        if AutoLupenEnabled then
+            stopAutoLupen()
+            startAutoLupen()
+        end
+    end
+end)
 
 local SettingsTab = Window:AddTab({ Title = "Settings", Icon = "settings" })
 
