@@ -227,8 +227,8 @@ local getKeyBtn = Instance.new("TextButton")
 getKeyBtn.Name = "GetKeyButton"
 getKeyBtn.Size = UDim2.new(0, 260, 0, 60)
 getKeyBtn.Position = UDim2.new(0, 420, 0, 280)
-getKeyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-getKeyBtn.Text = "Get Key"
+getKeyBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+getKeyBtn.Text = "Locked"
 getKeyBtn.Font = Enum.Font.SourceSansBold
 getKeyBtn.TextSize = 35
 getKeyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -271,13 +271,13 @@ task.spawn(animateLogo)
 
 --- Platoboost Key System Configuration ---
 local service = 16094
-local secret = "9bfce86e-a6fc-4baf-93d8-4d77a2254e41"
-local useNonce = false
+local secret = ""
+local useNonce = true
 
 -- Режим тестирования (для быстрой проверки FREE ключей)
-local TEST_MODE = false
+local TEST_MODE = true
 local TEST_KEYS = {
-    ["FREE_NEWYEAR"] = true,
+    ["FREE_KEY"] = true,
     ["FREE_TEST"] = true,
     ["FREE_ACCESS"] = true
 }
@@ -705,8 +705,8 @@ getKeyBtn.MouseButton1Click:Connect(function()
         end
         
         -- Сбрасываем кнопку
-        getKeyBtn.Text = "Get Key"
-        getKeyBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        getKeyBtn.Text = "Locked"
+        getKeyBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
         getKeyBtn.TextSize = 35
         getKeyBtn.AutoButtonColor = true
         rotationSpeed = 0.5
@@ -804,7 +804,7 @@ end)
 if TEST_MODE then
     task.spawn(function()
         task.wait(1)
-        keyInput.Text = "FREE_NEWYEAR"
+        keyInput.Text = "FREE_KEY"
         showMessage("Test key inserted automatically", Color3.fromRGB(0, 255, 0))
     end)
 end
