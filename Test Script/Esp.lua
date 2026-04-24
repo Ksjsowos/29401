@@ -1,214 +1,217 @@
--- Optimized Esp.lua (постоянно работающий ESP)
+-- Esp_Optimized.lua
+-- Optimized external Player ESP for URL loadstring usage.
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- Конфигурация
-local CONFIG = {
-    ESP_NAME = "ExternalPlayerESP",
-    GUI_SIZE = UDim2.new(0, 120, 0, 40),
-    STUDS_OFFSET = Vector3.new(0, 3.5, 0),
-    MAX_DISTANCE = 1500,
-    TEXT_SIZE = 14,
-    TEXT_STROKE_TRANSPARENCY = 0.5,
-    UPDATE_INTERVAL = 0.1, -- Интервал обновления в секундах
-    COLOR_NORMAL = Color3.fromRGB(255, 255, 255),
-    COLOR_REVIVES = Color3.fromRGB(255, 255, 0),
-    COLOR_DOWNED = Color3.fromRGB(255, 0, 0)
-}
+local UPDATE_INTERVAL = 0.2
+local espInstances = {}
+local updateConnection = nil
+local accumulator = 0
 
--- Глобальные переменные
 _G.ExternalESPRunning = true
-local ESPInstances = {}
-local ESPConnection = nil
-local lastUpdateTime = 0
 
--- Функция для полного удаления ESP
-_G.StopExternalESP = function()
-    _G.ExternalESPRunning = false
-    
-    if ESPConnection then
-        ESPConnection:Disconnect()
-        ESPConnection = nil
-    end
-    
-    -- Быстрое удаление всех ESP
-    for _, esp in pairs(ESPInstances) do
-        if esp and esp.Parent then
-            esp:Destroy()
+local function clearAll()
+    for player, gui in pairs(espInstances) do
+        if gui and gui.Parent then
+            gui:Destroy()
         end
+        espInstances[player] = nil
     end
-    table.clear(ESPInstances)
-    
-    print("[External ESP] Stopped")
 end
 
--- Создание ESP для игрока
-local function createESP(player)
-    if not _G.ExternalESPRunning or player == LocalPlayer then return end
-    
+local function resolveTargetPart(character)
+    if not character then
+        return nil
+    end
+
+    return character:FindFirstChild("Head")
+        or character:FindFirstChild("UpperTorso")
+        or character:FindFirstChild("HumanoidRootPart")
+        or character.PrimaryPart
+        or character:FindFirstChildWhichIsA("BasePart")
+end
+
+local function hideDefaultName(character)
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.DisplayDistanceType ~= Enum.HumanoidDisplayDistanceType.None then
+        humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+    end
+end
+
+local function createPlayerESP(player)
+    if player == LocalPlayer then return end
     local character = player.Character
     if not character then return end
-    
-    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    if not head then return end
-    
-    -- Удаление существующего ESP
-    local existingESP = ESPInstances[player]
-    if existingESP and existingESP.Parent then
-        existingESP:Destroy()
+    local targetPart = resolveTargetPart(character)
+    if not targetPart then return end
+
+    hideDefaultName(character)
+
+    local old = espInstances[player]
+    if old and old.Parent then
+        old:Destroy()
     end
-    
-    -- Создаем BillboardGui
+
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = CONFIG.ESP_NAME
-    billboard.Adornee = head
-    billboard.Size = CONFIG.GUI_SIZE
-    billboard.StudsOffset = CONFIG.STUDS_OFFSET
+    billboard.Name = "ExternalPlayerESP"
+    billboard.Adornee = targetPart
+    billboard.Size = UDim2.new(0, 120, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
     billboard.AlwaysOnTop = true
-    billboard.MaxDistance = CONFIG.MAX_DISTANCE
-    billboard.Active = true
+    billboard.MaxDistance = 1500
     billboard.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Текст
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.TextColor3 = CONFIG.COLOR_NORMAL
-    textLabel.TextSize = CONFIG.TEXT_SIZE
-    textLabel.Font = Enum.Font.RobotoMono
-    textLabel.TextStrokeTransparency = CONFIG.TEXT_STROKE_TRANSPARENCY
-    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-    
-    -- Устанавливаем родитель после настройки всех параметров (оптимизация)
-    textLabel.Parent = billboard
-    billboard.Parent = head
-    
-    ESPInstances[player] = billboard
-    
-    -- Устанавливаем начальный текст
-    local humanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local distance = humanoidRootPart and (head.Position - humanoidRootPart.Position).Magnitude or 0
-    textLabel.Text = string.format("%s [%dm]", player.Name, math.floor(distance))
-    
+    billboard.Parent = targetPart
+
+    local label = Instance.new("TextLabel")
+    label.Name = "ESPText"
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = player.Name
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.Font = Enum.Font.RobotoMono
+    label.TextStrokeTransparency = 0.5
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Parent = billboard
+
+    espInstances[player] = billboard
     return billboard
 end
 
--- Обновление всех ESP
-local function updateAllESP()
-    -- Ограничение частоты обновления
-    local currentTime = tick()
-    if currentTime - lastUpdateTime < CONFIG.UPDATE_INTERVAL then
+local function updateAll()
+    if not _G.ExternalESPRunning then
         return
     end
-    lastUpdateTime = currentTime
-    
-    if not _G.ExternalESPRunning then return end
-    
-    local localHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not localHRP then return end
-    
-    -- Локальные переменные для оптимизации
-    local espInstances = ESPInstances
-    local players = Players:GetPlayers()
-    
-    -- Обновляем существующие ESP
-    for i = #players, 1, -1 do -- Обратный цикл для эффективности
-        local player = players[i]
-        if player ~= LocalPlayer then
-            local esp = espInstances[player]
-            if esp and esp.Parent then
-                local character = player.Character
-                if character then
-                    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-                    local textLabel = esp:FindFirstChildOfClass("TextLabel")
-                    
-                    if head and textLabel then
-                        -- Расстояние
-                        local distance = (head.Position - localHRP.Position).Magnitude
-                        
-                        -- Цвет и текст в зависимости от состояния
-                        local textColor = CONFIG.COLOR_NORMAL
-                        local extraText = ""
-                        
-                        if character:FindFirstChild("Revives") then
-                            textColor = CONFIG.COLOR_REVIVES
-                            extraText = "] [Revives"
-                        elseif character:GetAttribute("Downed") then
-                            textColor = CONFIG.COLOR_DOWNED
-                            extraText = "] [Downed"
-                        end
-                        
-                        textLabel.Text = string.format("%s [%dm%s]", player.Name, math.floor(distance), extraText)
-                        textLabel.TextColor3 = textColor
-                    end
-                else
-                    -- Удаляем невалидные ESP
-                    esp:Destroy()
-                    espInstances[player] = nil
+
+    local myCharacter = LocalPlayer.Character
+    local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+
+    for player, gui in pairs(espInstances) do
+        if not player or not player.Parent or not player.Character or not gui or not gui.Parent then
+            if gui then
+                gui:Destroy()
+            end
+            espInstances[player] = nil
+        else
+            local character = player.Character
+            local targetPart = resolveTargetPart(character)
+            local label = gui:FindFirstChild("ESPText")
+
+            hideDefaultName(character)
+
+            if targetPart and gui.Adornee ~= targetPart then
+                gui.Adornee = targetPart
+                if gui.Parent ~= targetPart then
+                    gui.Parent = targetPart
+                end
+            end
+
+            if targetPart and label then
+                local color = Color3.fromRGB(255, 255, 255)
+                local suffix = ""
+                local metersText = "?m"
+
+                if character:FindFirstChild("Revives") then
+                    color = Color3.fromRGB(255, 255, 0)
+                    suffix = " [Revives]"
+                elseif character:GetAttribute("Downed") or player:GetAttribute("Downed") then
+                    color = Color3.fromRGB(255, 0, 0)
+                    suffix = " [Downed]"
+                end
+
+                if myRoot then
+                    local distance = math.floor((targetPart.Position - myRoot.Position).Magnitude)
+                    metersText = string.format("%dm", distance)
+                end
+
+                local newText = string.format("%s [%s]%s", player.Name, metersText, suffix)
+                if label.Text ~= newText then
+                    label.Text = newText
+                end
+                if label.TextColor3 ~= color then
+                    label.TextColor3 = color
                 end
             end
         end
     end
-    
-    -- Проверяем новых игроков
-    for i = #players, 1, -1 do
-        local player = players[i]
-        if player ~= LocalPlayer and not espInstances[player] and player.Character then
-            createESP(player)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and not espInstances[player] then
+            createPlayerESP(player)
         end
     end
 end
 
--- Инициализация ESP для всех игроков
-local function initializePlayerESP(player)
-    if player ~= LocalPlayer and player.Character then
-        createESP(player)
+local function start()
+    _G.ExternalESPRunning = true
+    if updateConnection then
+        return true
     end
-    
-    -- Ожидание появления персонажа
-    player.CharacterAdded:Connect(function(character)
-        task.delay(0.5, function()
-            if _G.ExternalESPRunning then
-                createESP(player)
-            end
-        end)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            createPlayerESP(player)
+        end
+    end
+
+    accumulator = 0
+    updateConnection = RunService.Heartbeat:Connect(function(dt)
+        accumulator = accumulator + (dt or 0)
+        if accumulator < UPDATE_INTERVAL then
+            return
+        end
+        accumulator = 0
+        updateAll()
     end)
+
+    return true
 end
 
--- Инициализация для существующих игроков
-for _, player in ipairs(Players:GetPlayers()) do
-    initializePlayerESP(player)
+local function stop()
+    _G.ExternalESPRunning = false
+    if updateConnection then
+        updateConnection:Disconnect()
+        updateConnection = nil
+    end
+    clearAll()
 end
 
--- Подключение для новых игроков
-Players.PlayerAdded:Connect(initializePlayerESP)
+_G.StopExternalESP = stop
 
--- Очистка при выходе игрока
 Players.PlayerRemoving:Connect(function(player)
-    local esp = ESPInstances[player]
-    if esp then
-        esp:Destroy()
-        ESPInstances[player] = nil
+    local gui = espInstances[player]
+    if gui then
+        gui:Destroy()
+        espInstances[player] = nil
     end
 end)
 
--- Главный loop для обновления ESP
-ESPConnection = RunService.Heartbeat:Connect(updateAllESP)
-
--- Автоматическое восстановление при респавне локального игрока
-LocalPlayer.CharacterAdded:Connect(function()
-    task.delay(1, function()
+Players.PlayerAdded:Connect(function(player)
+    if player == LocalPlayer then return end
+    player.CharacterAdded:Connect(function()
+        task.wait(0.5)
         if _G.ExternalESPRunning then
-            -- Пересоздаем ESP для всех игроков
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    createESP(player)
-                end
-            end
+            createPlayerESP(player)
         end
     end)
 end)
 
-print("[External ESP] Loaded and running")
-return _G.StopExternalESP
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.8)
+    if _G.ExternalESPRunning then
+        updateAll()
+    end
+end)
+
+start()
+
+return {
+    Start = start,
+    Stop = stop,
+    ClearAll = clearAll,
+    IsRunning = function()
+        return _G.ExternalESPRunning == true
+    end
+}
